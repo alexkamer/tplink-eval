@@ -379,7 +379,20 @@ def main() -> int:
         )
         router.login()
         while True:
-            samples = _apply_device_map(router.traffic(), device_map)
+            try:
+                samples = _apply_device_map(router.traffic(), device_map)
+            except RouterError as exc:
+                if args.interval == 0:
+                    raise
+                timestamp = datetime.now(timezone.utc).isoformat()
+                print(f"warning: {timestamp} poll failed: {exc}", file=sys.stderr)
+                try:
+                    router.login()
+                except RouterError as relogin_exc:
+                    print(f"warning: re-login failed: {relogin_exc}", file=sys.stderr)
+                time.sleep(args.interval)
+                continue
+
             document = _sample_document(samples)
             line = json.dumps(document, separators=(",", ":"))
             if args.json:
